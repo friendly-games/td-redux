@@ -1,0 +1,94 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+
+using System;
+using System.Linq;
+using System.Text;
+using System.Collections.Generic;
+
+namespace NineByteGames.Core
+{
+
+<#
+for (int g = 1; g < 8; g++)
+{
+#>
+  public delegate void SystemProcessorCallback<<#GenericList(g);#>>(Entity entity, <#
+      Join(g, i => "ref T$ component$", ", ");
+      
+  #>);
+<#
+}
+#>
+
+
+
+  public partial class SystemProcessor
+  {
+  
+    private Action<Entity> _processCallback;
+
+  <#
+    for (int genericCount = 1; genericCount < 8; genericCount++)
+    {
+  #>
+    
+    protected void Initialize<<#GenericList(genericCount);#>>(
+      SystemProcessorCallback<<#GenericList(genericCount);#>> callback, <#
+        Join(genericCount, i => "\r\n      ComponentId<T" + i + "> componentId" + i, ", ");
+     #>)
+    {
+      _processCallback = delegate(Entity entity)
+      {
+      <#
+        WriteLines(genericCount, i => "        ComponentReference<T$> component$ = entity.GetComponentReference(componentId$);");
+      #>
+
+        callback.Invoke(entity, <# Join(genericCount, i => "ref component$.Value", ", "); #>);
+      };
+    }
+
+  <#
+  }
+  #>
+  
+  }
+
+  <#
+  for (int genericCount = 1; genericCount < 8; genericCount++)
+  {
+#>
+  
+<#
+}
+#>
+
+
+}
+
+<#+
+private void GenericList(int count)
+{
+   Join(count, i => "T" + i);
+}
+
+private void Join(int count, Func<int, string> transformer, string joinBy = ",")
+{
+  var text = String.Join(joinBy, Enumerable.Range(1, count).Select(i => transformer.Invoke(i).Replace("$", i.ToString())));
+  Write(text);
+}
+
+private void WriteLines(int count, Func<int, string> transformer)
+{
+  WriteLine("");
+  for (int i = 1; i <= count; i++)
+  {
+    var str = transformer(i).Replace("$", i.ToString());
+    WriteLine(CurrentIndent + str);
+  }
+}
+#>
