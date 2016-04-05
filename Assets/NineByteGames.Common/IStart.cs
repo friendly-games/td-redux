@@ -10,4 +10,10 @@ namespace NineByteGames.Common
     /// <summary> Invoked when the object is initialized. </summary>
     void Start();
   }
+
+  /// <summary> Represents a MonoBehavior that is updated per tick. </summary>
+  public interface IUpdate
+  {
+    void Update();
+  }
 }
