@@ -8,7 +8,7 @@ using UnityEngine;
 
 public class SpritePostProcessor : AssetPostprocessor
 {
-  public int pixelsPerUnit = 32;
+  public int pixelsPerUnit = 16;
   public bool mipMapEnabled = false;
   public FilterMode filterMode = FilterMode.Bilinear;
   public TextureImporterFormat textureFormat = TextureImporterFormat.AutomaticTruecolor;

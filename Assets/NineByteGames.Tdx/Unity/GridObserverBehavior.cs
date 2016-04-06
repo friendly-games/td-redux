@@ -15,27 +15,44 @@ namespace NineByteGames.Tdx.Unity
   {
     private ViewableGrid _viewableGrid;
     private TemplatesBehavior _templates;
+    private WorldGrid _worldGrid;
 
     public void Start()
     {
       _templates = GetComponent<TemplatesBehavior>();
 
       // TODO get the grid from elsewhere
-      Initialize(new ViewableGrid());
+      _worldGrid = new WorldGrid();
+      _viewableGrid = new ViewableGrid(_worldGrid);
+      Initialize();
+    }
+
+    public void Update()
+    {
+      // TODO don't use the camera
+      var position = Camera.main.transform.position;
+      _viewableGrid.Recenter(position);
     }
 
     /// <summary> Sets up the Observer to watch the given grid. </summary>
-    public void Initialize(ViewableGrid grid)
+    public void Initialize()
     {
-      _viewableGrid = grid;
-      _viewableGrid.GridItemChanged += HandleGridItemChanged;
+      //_viewableGrid.GridItemChanged += HandleGridItemChanged;
+      _viewableGrid.ViewableChunkChanged += HandleVisibleChunkChanged;
+      _viewableGrid.Recenter(Vector2.zero);
+    }
 
-      for (int x = 0; x < _viewableGrid.Width; x++)
+    private void HandleVisibleChunkChanged(Chunk oldchunk, Chunk newChunk)
+    {
+      if (newChunk == null)
+        return;
+
+      for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
       {
-        for (int y = 0; y < _viewableGrid.Height; y++)
+        for (int y = 0; y < Chunk.NumberOfGridItemsHigh; y++)
         {
-          var position = new GridPosition(x, y);
-          var item = _viewableGrid[position];
+          var position = new GridCoordinate(newChunk.Position, new InnerChunkGridCoordinate(x, y));
+          var item = newChunk[position.InnerChunkGridCoordinate];
 
           UpdateSprite(position, item);
         }
@@ -43,20 +60,20 @@ namespace NineByteGames.Tdx.Unity
     }
 
     /// <summary> Callback to invoke when a GridItem changes. </summary>
-    private void HandleGridItemChanged(GridPosition position, GridItem oldvalue, GridItem newvalue)
+    private void HandleGridItemChanged(GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
     {
-      UpdateSprite(position, newvalue);
+      UpdateSprite(coordinate, newvalue);
     }
 
     /// <summary> Updates the sprite for the given item at the given position. </summary>
-    private void UpdateSprite(GridPosition position, GridItem item)
+    private void UpdateSprite(GridCoordinate coordinate, GridItem item)
     {
       var tileTemplate = _templates.Tiles.First(t => t.Name == item.Type);
       var template = tileTemplate.Template;
 
       // TODO don't create a new object each time.
       // TODO remove old items
-      var newObject = template.Clone(position.ToUpperRight(Vector2.zero));
+      var newObject = template.Clone(coordinate.ToUpperRight(Vector2.zero));
       newObject.SetParent(gameObject);
     }
   }
