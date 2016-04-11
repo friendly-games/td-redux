@@ -57,19 +57,19 @@ namespace NineByteGames.Tdx.Unity
           var position = new GridCoordinate(newChunk.Position, new InnerChunkGridCoordinate(x, y));
           var item = newChunk[position.InnerChunkGridCoordinate];
 
-          UpdateSprite(position, item);
+          UpdateSprite(newChunk, position, item);
         }
       }
     }
 
     /// <summary> Callback to invoke when a GridItem changes. </summary>
-    private void HandleGridItemChanged(GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
+    private void HandleGridItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
     {
-      UpdateSprite(coordinate, newvalue);
+      UpdateSprite(chunk, coordinate, newvalue);
     }
 
     /// <summary> Updates the sprite for the given item at the given position. </summary>
-    private void UpdateSprite(GridCoordinate coordinate, GridItem item)
+    private void UpdateSprite(Chunk chunk, GridCoordinate coordinate, GridItem item)
     {
       var tileTemplate = _templates.Tiles.First(t => t.Name == item.Type);
       var template = tileTemplate.Template;

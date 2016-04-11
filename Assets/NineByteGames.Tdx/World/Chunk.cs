@@ -89,7 +89,7 @@ namespace NineByteGames.Tdx.World
       set
       {
         var existing = this[coordinate];
-        OnGridItemChanged(new GridCoordinate(Position, coordinate), existing, value);
+        OnGridItemChanged(this, new GridCoordinate(Position, coordinate), existing, value);
         _items[CalculateIndex(coordinate.X, coordinate.Y)] = value;
       }
     }
@@ -99,11 +99,11 @@ namespace NineByteGames.Tdx.World
     /// </summary>
     public event GridItemChangedCallback GridItemChanged;
 
-    private void OnGridItemChanged(GridCoordinate coordinate, GridItem oldValue, GridItem newValue)
+    private void OnGridItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldValue, GridItem newValue)
     {
       var handler = GridItemChanged;
       if (handler != null)
-        handler(coordinate, oldValue, newValue);
+        handler(chunk, coordinate, oldValue, newValue);
     }
 
     private int CalculateIndex(int x, int y)

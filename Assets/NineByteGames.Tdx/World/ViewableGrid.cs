@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using NineByteGames.Common.Utils;
 using UnityEngine;
 
 namespace NineByteGames.Tdx.World
 {
   /// <summary> Callback to be invoked when a grid item changes. </summary>
-  public delegate void GridItemChangedCallback(GridCoordinate coordinate, GridItem oldValue, GridItem newValue);
+  public delegate void GridItemChangedCallback(
+    Chunk chunk,
+    GridCoordinate coordinate,
+    GridItem oldValue,
+    GridItem newValue);
 
   /// <summary> Callback to be invoked for each grid item. </summary>
   public delegate void GridItemCallback(GridCoordinate coordinate, GridItem item);
@@ -101,12 +104,12 @@ namespace NineByteGames.Tdx.World
       // we've detected a change, so unsubscribe + subscribe from all of the stuff
       if (oldChunk != null)
       {
-        oldChunk.GridItemChanged -= HandleGridItemChanged;
+        oldChunk.GridItemChanged -= OnGridItemChanged;
       }
 
       if (newChunk != null)
       {
-        newChunk.GridItemChanged += HandleGridItemChanged;
+        newChunk.GridItemChanged += OnGridItemChanged;
       }
 
       OnViewableChunkChanged(oldChunk, newChunk);
@@ -117,11 +120,11 @@ namespace NineByteGames.Tdx.World
     /// </summary>
     public event GridItemChangedCallback GridItemChanged;
 
-    private void OnGridItemChanged(GridCoordinate coordinate, GridItem oldValue, GridItem newValue)
+    private void OnGridItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldValue, GridItem newValue)
     {
       var handler = GridItemChanged;
       if (handler != null)
-        handler(coordinate, oldValue, newValue);
+        handler(chunk, coordinate, oldValue, newValue);
     }
 
     /// <summary>
@@ -134,13 +137,6 @@ namespace NineByteGames.Tdx.World
       var handler = ViewableChunkChanged;
       if (handler != null)
         handler(oldchunk, newchunk);
-    }
-
-    /// <summary> Handler when one of the currently observed chunks' items changed. </summary>
-    private void HandleGridItemChanged(GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
-    {
-      // just forward it to our observers
-      OnGridItemChanged(coordinate, oldvalue, newvalue);
     }
   }
 
