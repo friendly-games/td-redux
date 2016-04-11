@@ -10,7 +10,7 @@ namespace NineByteGames.Tdx.Unity
   public class UnityPlayerBehavior : MonoBehaviour,
                                      IUpdate,
                                      IStart,
-                                     IEnginePlayer
+                                     IEngineObject
   {
     private PlayerMover _playerMover;
 

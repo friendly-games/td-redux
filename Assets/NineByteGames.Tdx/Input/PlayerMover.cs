@@ -7,7 +7,7 @@ using UnityEngine;
 namespace NineByteGames.Tdx.Input
 {
   /// <summary> Represents a single-player in the engine. </summary>
-  public interface IEnginePlayer
+  public interface IEngineObject
   {
     Vector3 Position { get; set; }
   }
@@ -21,10 +21,10 @@ namespace NineByteGames.Tdx.Input
   /// <summary> A player mover. </summary>
   public class PlayerMover
   {
-    private readonly IEnginePlayer _enginePlayer;
+    private readonly IEngineObject _enginePlayer;
     private readonly IEngineTime _engineTime;
 
-    public PlayerMover(IEnginePlayer enginePlayer, IEngineTime engineTime)
+    public PlayerMover(IEngineObject enginePlayer, IEngineTime engineTime)
     {
       _enginePlayer = enginePlayer;
       _engineTime = engineTime;
