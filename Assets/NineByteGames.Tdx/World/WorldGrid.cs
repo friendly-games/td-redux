@@ -9,8 +9,9 @@ namespace NineByteGames.Tdx.World
   /// </summary>
   public class WorldGrid
   {
-    public int NumberOfChunksWide = 64;
-    public int NumberOfChunksHigh = 64;
+    // TODO make this bigger (bigger makes it slower to start)
+    public int NumberOfChunksWide = 4;
+    public int NumberOfChunksHigh = 4;
 
     private readonly Chunk[] _chunks;
 

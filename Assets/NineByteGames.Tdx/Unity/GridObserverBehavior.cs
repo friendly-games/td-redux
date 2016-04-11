@@ -16,30 +16,33 @@ namespace NineByteGames.Tdx.Unity
     private ViewableGrid _viewableGrid;
     private TemplatesBehavior _templates;
     private WorldGrid _worldGrid;
+    private Camera _itemToTrack;
 
     public void Start()
     {
       _templates = GetComponent<TemplatesBehavior>();
 
       // TODO get the grid from elsewhere
-      _worldGrid = new WorldGrid();
+      // TODO don't use the camera
+      Initialize(new WorldGrid(), Camera.main);
+    }
+
+    /// <summary> Sets up the Observer to watch the given grid. </summary>
+    public void Initialize(WorldGrid worldGrid, Camera itemToTrack)
+    {
+      _itemToTrack = itemToTrack;
+
+      _worldGrid = worldGrid;
       _viewableGrid = new ViewableGrid(_worldGrid);
-      Initialize();
+      _viewableGrid.GridItemChanged += HandleGridItemChanged;
+      _viewableGrid.ViewableChunkChanged += HandleVisibleChunkChanged;
+      _viewableGrid.Recenter(Vector2.zero);
     }
 
     public void Update()
     {
-      // TODO don't use the camera
-      var position = Camera.main.transform.position;
+      var position = _itemToTrack.transform.position;
       _viewableGrid.Recenter(position);
-    }
-
-    /// <summary> Sets up the Observer to watch the given grid. </summary>
-    public void Initialize()
-    {
-      //_viewableGrid.GridItemChanged += HandleGridItemChanged;
-      _viewableGrid.ViewableChunkChanged += HandleVisibleChunkChanged;
-      _viewableGrid.Recenter(Vector2.zero);
     }
 
     private void HandleVisibleChunkChanged(Chunk oldchunk, Chunk newChunk)

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using NineByteGames.Common.Utils;
 using UnityEngine;
 
 namespace NineByteGames.Tdx.World
@@ -86,21 +87,29 @@ namespace NineByteGames.Tdx.World
         newChunk = _world[chunkCoordinate];
       }
 
-      var viewableXOffset = PositiveRemainder(chunkCoordinate.X, 3);
-      var viewableYOffset = PositiveRemainder(chunkCoordinate.Y, 3);
+      // TODO allow more than just 3 chunks in each direction
+      var viewableXOffset = MathUtils.PositiveRemainder(chunkCoordinate.X, 3);
+      var viewableYOffset = MathUtils.PositiveRemainder(chunkCoordinate.Y, 3);
       var oldChunk = _visibleChunks[viewableXOffset, viewableYOffset];
 
+      // they're the same so we don't have to do anything
       if (oldChunk == newChunk)
         return;
 
       _visibleChunks[viewableXOffset, viewableYOffset] = newChunk;
 
-      OnViewableChunkChanged(oldChunk, newChunk);
-    }
+      // we've detected a change, so unsubscribe + subscribe from all of the stuff
+      if (oldChunk != null)
+      {
+        oldChunk.GridItemChanged -= HandleGridItemChanged;
+      }
 
-    private static int PositiveRemainder(int value, int divisor)
-    {
-      return ((value % divisor) + divisor) % divisor;
+      if (newChunk != null)
+      {
+        newChunk.GridItemChanged += HandleGridItemChanged;
+      }
+
+      OnViewableChunkChanged(oldChunk, newChunk);
     }
 
     /// <summary>
@@ -125,6 +134,13 @@ namespace NineByteGames.Tdx.World
       var handler = ViewableChunkChanged;
       if (handler != null)
         handler(oldchunk, newchunk);
+    }
+
+    /// <summary> Handler when one of the currently observed chunks' items changed. </summary>
+    private void HandleGridItemChanged(GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
+    {
+      // just forward it to our observers
+      OnGridItemChanged(coordinate, oldvalue, newvalue);
     }
   }
 
