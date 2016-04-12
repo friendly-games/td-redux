@@ -28,11 +28,20 @@ namespace NineByteGames.Tdx.World
       Data = new T[width * height];
     }
 
-    private int _elementsWide;
+    /// <summary> Gets the existing value at the specified index and returns the old value.  </summary>
+    public T Swap(int x, int y, T newValue)
+    {
+      var index = CalculateIndex(x, y);
+
+      var existing = Data[index];
+      Data[index] = newValue;
+
+      return existing;
+    }
 
     private int CalculateIndex(int x, int y)
     {
-      return y * _elementsWide + x;
+      return y * Width + x;
     }
   }
 }

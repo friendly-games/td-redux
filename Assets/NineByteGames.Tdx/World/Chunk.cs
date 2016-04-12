@@ -8,7 +8,7 @@ namespace NineByteGames.Tdx.World
   /// <summary>
   ///  Represents a square portion of the map containing the tiles.
   /// </summary>
-  public class Chunk
+  public class Chunk : CoreObject
   {
     /// <summary> The number of GridItems wide in each chunk. </summary>
     public const int NumberOfGridItemsWide = 64;

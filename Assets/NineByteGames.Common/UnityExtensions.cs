@@ -32,5 +32,11 @@ namespace NineByteGames.Common
     {
       return (GameObject)Object.Instantiate(instance, position, quaternion);
     }
+
+    /// <summary> Check if the given game object is null. </summary>
+    public static bool IsNull(this GameObject gameObject)
+    {
+      return ReferenceEquals(gameObject, null);
+    }
   }
 }
