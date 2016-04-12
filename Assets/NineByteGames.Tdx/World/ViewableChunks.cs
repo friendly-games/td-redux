@@ -23,32 +23,35 @@ namespace NineByteGames.Tdx.World
   ///  occur to that section of the world.  Useful for the UI that is only
   ///  interested in changes that are currently visible to the user.
   /// </summary>
-  public sealed class ViewableGrid
+  public sealed class ViewableChunks
   {
     private readonly WorldGrid _world;
 
     private readonly Array2D<Chunk> _visibleChunks;
     private ChunkCoordinate? _centeredChunkCoordinate;
 
+    private readonly int _xRadius;
+    private readonly int _yRadius;
+
     /// <summary> Default constructor. </summary>
-    public ViewableGrid(WorldGrid worldGrid)
+    public ViewableChunks(WorldGrid worldGrid, int xRadius, int yRadius)
     {
       _world = worldGrid;
 
-      _visibleChunks = new Array2D<Chunk>(3, 3);
+      _xRadius = xRadius;
+      _yRadius = yRadius;
+
+      NumberOfChunksWide = _xRadius * 2 + 1;
+      NumberOfChunksHigh = _yRadius * 2 + 1;
+
+      _visibleChunks = new Array2D<Chunk>(NumberOfChunksWide, NumberOfChunksHigh);
     }
 
     /// <summary> Gets the number of items in the Y direction. </summary>
-    public int NumberOfGridItemsHigh
-    {
-      get { return Chunk.NumberOfGridItemsHigh; }
-    }
+    public int NumberOfChunksHigh { get; private set; }
 
     /// <summary> Gets the number of items in the X direction. </summary>
-    public int NumberOfGridItemsWide
-    {
-      get { return Chunk.NumberOfGridItemsWide; }
-    }
+    public int NumberOfChunksWide { get; private set; }
 
     public void Recenter(Vector2 position, bool shouldForce = false)
     {
@@ -60,9 +63,9 @@ namespace NineByteGames.Tdx.World
       if (!shouldForce && _centeredChunkCoordinate == centeredChunkCoordinate)
         return;
 
-      for (int yOffset = -1; yOffset < 2; yOffset++)
+      for (int yOffset = -_yRadius; yOffset <= _yRadius; yOffset++)
       {
-        for (int xOffset = -1; xOffset < 2; xOffset++)
+        for (int xOffset = -_xRadius; xOffset <= _xRadius; xOffset++)
         {
           var chunkCoordinate = centeredChunkCoordinate;
           chunkCoordinate.X += xOffset;
@@ -95,9 +98,8 @@ namespace NineByteGames.Tdx.World
         newChunk = _world[chunkCoordinate];
       }
 
-      // TODO allow more than just 3 chunks in each direction
-      var viewableXOffset = MathUtils.PositiveRemainder(chunkCoordinate.X, 3);
-      var viewableYOffset = MathUtils.PositiveRemainder(chunkCoordinate.Y, 3);
+      var viewableXOffset = MathUtils.PositiveRemainder(chunkCoordinate.X, NumberOfChunksWide);
+      var viewableYOffset = MathUtils.PositiveRemainder(chunkCoordinate.Y, NumberOfChunksHigh);
       var oldChunk = _visibleChunks[viewableXOffset, viewableYOffset];
 
       // they're the same so we don't have to do anything

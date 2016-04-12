@@ -14,7 +14,7 @@ namespace NineByteGames.Tdx.Unity
                                       IStart,
                                       IUpdate
   {
-    private ViewableGrid _viewableGrid;
+    private ViewableChunks _viewableChunks;
     private TemplatesBehavior _templates;
     private WorldGrid _worldGrid;
     private Camera _itemToTrack;
@@ -36,17 +36,17 @@ namespace NineByteGames.Tdx.Unity
       _itemToTrack = itemToTrack;
 
       _worldGrid = worldGrid;
-      _viewableGrid = new ViewableGrid(_worldGrid);
-      _viewableGrid.GridItemChanged += HandleGridItemChanged;
-      _viewableGrid.ViewableChunkChanged += HandleVisibleChunkChanged;
-      _viewableGrid.Recenter(Vector2.zero);
+      _viewableChunks = new ViewableChunks(_worldGrid, 3, 3);
+      _viewableChunks.GridItemChanged += HandleChunksItemChanged;
+      _viewableChunks.ViewableChunkChanged += HandleVisibleChunkChanged;
+      _viewableChunks.Recenter(Vector2.zero);
     }
 
     /// <unitymethod />
     public void Update()
     {
       var position = _itemToTrack.transform.position;
-      _viewableGrid.Recenter(position);
+      _viewableChunks.Recenter(position);
 
       if (_chunksToProcess.Count > 0)
       {
@@ -93,7 +93,7 @@ namespace NineByteGames.Tdx.Unity
     }
 
     /// <summary> Callback to invoke when a GridItem changes. </summary>
-    private void HandleGridItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
+    private void HandleChunksItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
     {
       UpdateSprite(coordinate, newvalue, chunk.GetVisual<ChunkData>());
     }

@@ -10,35 +10,35 @@ namespace NineByteGames.Tdx.World
   /// </summary>
   public class Chunk : CoreObject
   {
+    /// <summary>
+    ///  How many bits to shift a <see cref="GridCoordinate"/> to get the
+    ///  <see cref="ChunkCoordinate"/>.
+    /// </summary>
+    public const int XGridCoordinateToChunkCoordinateBitShift = 4;
+
+    /// <summary>
+    ///  How many bits to shift a <see cref="GridCoordinate"/> to get the
+    ///  <see cref="ChunkCoordinate"/>.
+    /// </summary>
+    public const int YGridCoordinateToChunkCoordinateBitShift = XGridCoordinateToChunkCoordinateBitShift;
+
     /// <summary> The number of GridItems wide in each chunk. </summary>
-    public const int NumberOfGridItemsWide = 64;
+    public const int NumberOfGridItemsWide = 1 << XGridCoordinateToChunkCoordinateBitShift;
 
     /// <summary> The number of GridItems high in each chunk. </summary>
-    public const int NumberOfGridItemsHigh = 64;
+    public const int NumberOfGridItemsHigh = 1 << YGridCoordinateToChunkCoordinateBitShift;
 
     /// <summary>
     ///  The bits of a <see cref="GridCoordinate"/> that represent the
     ///  <see cref="InnerChunkGridCoordinate"/>
     /// </summary>
-    public const int GridItemsXCoordinateBitmask = (1 << XGridCoordinateToChunkCoordinateBitShift) - 1;
+    public const int GridItemsXCoordinateBitmask = NumberOfGridItemsWide - 1;
 
     /// <summary>
     ///  The bits of a <see cref="GridCoordinate"/> that represent the
     ///  <see cref="InnerChunkGridCoordinate"/>
     /// </summary>
-    public const int GridItemsYCoordinateBitmask = (1 << YGridCoordinateToChunkCoordinateBitShift) - 1;
-
-    /// <summary>
-    ///  How many bits to shift a <see cref="GridCoordinate"/> to get the
-    ///  <see cref="ChunkCoordinate"/>.
-    /// </summary>
-    public const int XGridCoordinateToChunkCoordinateBitShift = 6;
-
-    /// <summary>
-    ///  How many bits to shift a <see cref="GridCoordinate"/> to get the
-    ///  <see cref="ChunkCoordinate"/>.
-    /// </summary>
-    public const int YGridCoordinateToChunkCoordinateBitShift = 6;
+    public const int GridItemsYCoordinateBitmask = NumberOfGridItemsHigh - 1;
 
     /// <summary> All of the items that exist in the grid. </summary>
     private readonly GridItem[] _items;
