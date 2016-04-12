@@ -13,7 +13,7 @@ namespace NineByteGames.Tdx.World
     GridItem newValue);
 
   /// <summary> Callback to be invoked for each grid item. </summary>
-  public delegate void GridItemCallback(GridCoordinate coordinate, GridItem item);
+  public delegate void GridItemCallback(Chunk chunk, GridCoordinate coordinate, GridItem item);
 
   public delegate void ViewableChunkChanged(Chunk oldChunk, Chunk newChunk);
 
@@ -27,7 +27,7 @@ namespace NineByteGames.Tdx.World
   {
     private readonly WorldGrid _world;
 
-    private readonly Array2D<Chunk> _visibleChunks;
+    public readonly Array2D<Chunk> VisibleChunks;
     private ChunkCoordinate? _centeredChunkCoordinate;
 
     private readonly int _xRadius;
@@ -44,7 +44,7 @@ namespace NineByteGames.Tdx.World
       NumberOfChunksWide = _xRadius * 2 + 1;
       NumberOfChunksHigh = _yRadius * 2 + 1;
 
-      _visibleChunks = new Array2D<Chunk>(NumberOfChunksWide, NumberOfChunksHigh);
+      VisibleChunks = new Array2D<Chunk>(NumberOfChunksWide, NumberOfChunksHigh);
     }
 
     /// <summary> Gets the number of items in the Y direction. </summary>
@@ -100,13 +100,13 @@ namespace NineByteGames.Tdx.World
 
       var viewableXOffset = MathUtils.PositiveRemainder(chunkCoordinate.X, NumberOfChunksWide);
       var viewableYOffset = MathUtils.PositiveRemainder(chunkCoordinate.Y, NumberOfChunksHigh);
-      var oldChunk = _visibleChunks[viewableXOffset, viewableYOffset];
+      var oldChunk = VisibleChunks[viewableXOffset, viewableYOffset];
 
       // they're the same so we don't have to do anything
       if (oldChunk == newChunk)
         return;
 
-      _visibleChunks[viewableXOffset, viewableYOffset] = newChunk;
+      VisibleChunks[viewableXOffset, viewableYOffset] = newChunk;
 
       // we've detected a change, so unsubscribe + subscribe from all of the stuff
       if (oldChunk != null)

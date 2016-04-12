@@ -20,5 +20,35 @@ namespace NineByteGames.Tdx.World
     {
       return X + "," + Y;
     }
+
+    public bool Equals(GridCoordinate other)
+    {
+      return X == other.X && Y == other.Y;
+    }
+
+    public override bool Equals(object obj)
+    {
+      if (ReferenceEquals(null, obj))
+        return false;
+      return obj is GridCoordinate && Equals((GridCoordinate)obj);
+    }
+
+    public override int GetHashCode()
+    {
+      unchecked
+      {
+        return (X * 397) ^ Y;
+      }
+    }
+
+    public static bool operator ==(InnerChunkGridCoordinate left, InnerChunkGridCoordinate right)
+    {
+      return left.Equals(right);
+    }
+
+    public static bool operator !=(InnerChunkGridCoordinate left, InnerChunkGridCoordinate right)
+    {
+      return !left.Equals(right);
+    }
   }
 }

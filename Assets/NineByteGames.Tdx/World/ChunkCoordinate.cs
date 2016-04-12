@@ -45,5 +45,11 @@ namespace NineByteGames.Tdx.World
     {
       return !left.Equals(right);
     }
+
+    /// <inheritdoc />
+    public override string ToString()
+    {
+      return X + "," + Y;
+    }
   }
 }
