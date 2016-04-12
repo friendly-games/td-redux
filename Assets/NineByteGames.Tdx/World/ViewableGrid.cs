@@ -85,6 +85,11 @@ namespace NineByteGames.Tdx.World
       {
         newChunk = null;
       }
+      else if (chunkCoordinate.X >= WorldGrid.NumberOfChunksWide
+               || chunkCoordinate.Y >= WorldGrid.NumberOfChunksHigh)
+      {
+        newChunk = null;
+      }
       else
       {
         newChunk = _world[chunkCoordinate];

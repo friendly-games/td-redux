@@ -11,14 +11,16 @@ namespace NineByteGames.Tdx.Unity
   ///  Observes the grid for changes and adds or removes tiles as necessary.
   /// </summary>
   public class GridObserverBehavior : MonoBehaviour,
-                                      IStart
+                                      IStart,
+                                      IUpdate
   {
     private ViewableGrid _viewableGrid;
     private TemplatesBehavior _templates;
     private WorldGrid _worldGrid;
     private Camera _itemToTrack;
-    private readonly Queue<EnqueuedChunk> _chunksToProcess = new Queue<EnqueuedChunk>();
+    private readonly Queue<ChunkDataOperation> _chunksToProcess = new Queue<ChunkDataOperation>();
 
+    /// <unitymethod />
     public void Start()
     {
       _templates = GetComponent<TemplatesBehavior>();
@@ -40,6 +42,7 @@ namespace NineByteGames.Tdx.Unity
       _viewableGrid.Recenter(Vector2.zero);
     }
 
+    /// <unitymethod />
     public void Update()
     {
       var position = _itemToTrack.transform.position;
@@ -47,16 +50,17 @@ namespace NineByteGames.Tdx.Unity
 
       if (_chunksToProcess.Count > 0)
       {
-        bool didComplete;
-        var item = _chunksToProcess.Peek();
+        var operation = _chunksToProcess.Peek();
 
-        if (item.IsRemoving)
+        // NOTE we're adding/removing two rows at once TODO tweak this. 
+        bool didComplete;
+        if (operation.ShouldRemove)
         {
-          didComplete = ContinueRemoving(item);
+          didComplete = operation.Data.RemoveSingleRow();
         }
         else
         {
-          didComplete = ContinueAdding(item);
+          didComplete = operation.Data.AddSingleRow(this);
         }
 
         if (didComplete)
@@ -66,34 +70,36 @@ namespace NineByteGames.Tdx.Unity
       }
     }
 
+    /// <summary> Callback to be invoked when a new chunk has come into view. </summary>
+    /// <param name="oldchunk"> The oldchunk. </param>
+    /// <param name="newChunk"> The new chunk. </param>
     private void HandleVisibleChunkChanged(Chunk oldchunk, Chunk newChunk)
     {
+      // TODO handle a recently removed queue being re-added
       if (oldchunk != null)
       {
-        var oldVisual = oldchunk.GetVisual<ChunkVisuals>();
-        // TODO remove the actual tiles
-        oldVisual.IsRemoved = true;
-
-        _chunksToProcess.Enqueue(new EnqueuedChunk(oldchunk, true));
+        var chunkData = oldchunk.GetVisual<ChunkData>();
+        _chunksToProcess.Enqueue(new ChunkDataOperation(chunkData, shouldRemove: true));
       }
 
       if (newChunk != null)
       {
-        var visuals = new ChunkVisuals();
-        newChunk.SetVisual(visuals);
+        // TODO check if we have a visual and if so, reset it to start adding items back
+        var chunkData = new ChunkData(newChunk);
+        newChunk.SetVisual(chunkData);
 
-        _chunksToProcess.Enqueue(new EnqueuedChunk(newChunk, false));
+        _chunksToProcess.Enqueue(new ChunkDataOperation(chunkData, shouldRemove: false));
       }
     }
 
     /// <summary> Callback to invoke when a GridItem changes. </summary>
     private void HandleGridItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
     {
-      UpdateSprite(coordinate, newvalue, chunk.GetVisual<ChunkVisuals>());
+      UpdateSprite(coordinate, newvalue, chunk.GetVisual<ChunkData>());
     }
 
     /// <summary> Updates the sprite for the given item at the given position. </summary>
-    private void UpdateSprite(GridCoordinate coordinate, GridItem item, ChunkVisuals chunkVisuals)
+    private void UpdateSprite(GridCoordinate coordinate, GridItem item, ChunkData chunkVisuals)
     {
       var innerCoordinates = coordinate.InnerChunkGridCoordinate;
 
@@ -113,77 +119,104 @@ namespace NineByteGames.Tdx.Unity
       }
     }
 
-    private bool ContinueAdding(EnqueuedChunk chunkDataToProcess)
+    /// <summary> Represents an operation that needs to be performed on a chunk. </summary>
+    private struct ChunkDataOperation
     {
-      var chunk = chunkDataToProcess.TheChunk;
+      /// <summary> The chunk data that should be processed. </summary>
+      public readonly ChunkData Data;
 
-      int y = chunkDataToProcess.Y;
+      /// <summary> True if the chunk should be removed, false otherwise. </summary>
+      public readonly bool ShouldRemove;
 
-      for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
+      public ChunkDataOperation(ChunkData data, bool shouldRemove)
       {
-        var position = new GridCoordinate(chunk.Position, new InnerChunkGridCoordinate(x, y));
-        var item = chunk[position.InnerChunkGridCoordinate];
+        Data = data;
+        ShouldRemove = shouldRemove;
 
-        UpdateSprite(position, item, chunkDataToProcess.ChunkVisuals);
+        data.PrepareForOperation();
       }
-
-      chunkDataToProcess.Y++;
-
-      return chunkDataToProcess.Y >= Chunk.NumberOfGridItemsHigh;
     }
 
-    private bool ContinueRemoving(EnqueuedChunk chunkDataToProcess)
-    {
-      var chunk = chunkDataToProcess.TheChunk;
-      var visuals = chunkDataToProcess.ChunkVisuals;
-
-      int y = chunkDataToProcess.Y;
-
-      for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
-      {
-        var position = new GridCoordinate(chunk.Position, new InnerChunkGridCoordinate(x, y));
-
-        var tile = visuals.Tiles[position.InnerChunkGridCoordinate.X, position.InnerChunkGridCoordinate.Y];
-
-        // TODO recycle
-        if (tile != null)
-        {
-          Destroy(tile);
-        }
-      }
-
-      chunkDataToProcess.Y++;
-
-      return chunkDataToProcess.Y >= Chunk.NumberOfGridItemsHigh;
-    }
-
-    private class ChunkVisuals
+    /// <summary>
+    ///  Contains the GameObjects that are in the chunk (representing the tiles)
+    ///  and also contains the algorithms for updating the tile information.
+    /// </summary>
+    private class ChunkData
     {
       // TODO pool this
       public readonly Array2D<GameObject> Tiles = new Array2D<GameObject>(Chunk.NumberOfGridItemsWide,
                                                                           Chunk.NumberOfGridItemsHigh);
 
-      public bool IsRemoved;
-    }
+      // /state\
+      private readonly Chunk _owner;
+      private int _currentRow;
+      // \state/
 
-    private class EnqueuedChunk
-    {
-      public EnqueuedChunk(Chunk theChunk, bool isRemoving)
+      /// <summary> Constructor. </summary>
+      /// <exception cref="ArgumentNullException"> Thrown when one or more required
+      ///  arguments are null. </exception>
+      /// <param name="chunk"> The owner of the data. </param>
+      public ChunkData(Chunk chunk)
       {
-        if (theChunk == null)
-          throw new ArgumentNullException("theChunk");
+        if (chunk == null)
+          throw new ArgumentNullException("chunk");
 
-        TheChunk = theChunk;
-        ChunkVisuals = TheChunk.GetVisual<ChunkVisuals>();
-        IsRemoving = isRemoving;
-        Y = 0;
+        _owner = chunk;
+        _currentRow = 0;
       }
 
-      public readonly bool IsRemoving;
-      public readonly Chunk TheChunk;
-      public readonly ChunkVisuals ChunkVisuals;
+      /// <summary> Prepares the data to begin adding or removing rows. </summary>
+      public void PrepareForOperation()
+      {
+        _currentRow = 0;
+      }
 
-      public int Y;
+      /// <summary> Adds a single row of the chunk to the row. </summary>
+      /// <returns> True if it completed adding all rows in the chunk, false otherwise. </returns>
+      public bool AddSingleRow(GridObserverBehavior gridObserverBehavior)
+      {
+        var chunk = _owner;
+
+        int y = _currentRow;
+
+        for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
+        {
+          var position = new GridCoordinate(chunk.Position, new InnerChunkGridCoordinate(x, y));
+          var item = chunk[position.InnerChunkGridCoordinate];
+
+          gridObserverBehavior.UpdateSprite(position, item, this);
+        }
+
+        _currentRow++;
+
+        return _currentRow >= Chunk.NumberOfGridItemsHigh;
+      }
+
+      /// <summary> Removes a single row of the chunk </summary>
+      /// <returns> True if it completed removing all rows in the chunk, false otherwise. </returns>
+      public bool RemoveSingleRow()
+      {
+        var chunk = _owner;
+
+        int y = _currentRow;
+
+        for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
+        {
+          var position = new GridCoordinate(chunk.Position, new InnerChunkGridCoordinate(x, y));
+
+          var tile = Tiles.Swap(position.InnerChunkGridCoordinate.X, position.InnerChunkGridCoordinate.Y, null);
+
+          // TODO recycle
+          if (tile != null)
+          {
+            Destroy(tile);
+          }
+        }
+
+        _currentRow++;
+
+        return _currentRow >= Chunk.NumberOfGridItemsHigh;
+      }
     }
   }
 }
