@@ -14,7 +14,7 @@ namespace NineByteGames.Tdx.World
     ///  How many bits to shift a <see cref="GridCoordinate"/> to get the
     ///  <see cref="ChunkCoordinate"/>.
     /// </summary>
-    public const int XGridCoordinateToChunkCoordinateBitShift = 4;
+    public const int XGridCoordinateToChunkCoordinateBitShift = 6;
 
     /// <summary>
     ///  How many bits to shift a <see cref="GridCoordinate"/> to get the

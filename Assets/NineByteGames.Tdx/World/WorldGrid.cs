@@ -41,5 +41,14 @@ namespace NineByteGames.Tdx.World
     {
       return x + y * NumberOfChunksWide;
     }
+
+    /// <summary>
+    ///  Returns true if the given coordinate is a valid coordinate that can be used in this grid.
+    /// </summary>
+    public bool IsValid(ChunkCoordinate chunkCoordinate)
+    {
+      return chunkCoordinate.X >= 0 && chunkCoordinate.X < NumberOfChunksWide
+             && chunkCoordinate.Y >= 0 && chunkCoordinate.Y < NumberOfChunksWide;
+    }
   }
 }

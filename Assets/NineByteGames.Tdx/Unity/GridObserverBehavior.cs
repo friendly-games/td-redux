@@ -17,13 +17,14 @@ namespace NineByteGames.Tdx.Unity
     private TemplatesBehavior _templates;
     private WorldGrid _worldGrid;
     private Camera _itemToTrack;
-    private ViewableGrid _viewableGrid;
+    //private ViewableGrid _viewableGrid;
     private readonly Dictionary<GridCoordinate, GameObject> _lookup = new Dictionary<GridCoordinate, GameObject>();
 
     public int VisibleWidth = 40;
     public int VisibleHeight = 40;
 
     public int Count;
+    private ViewableGrid _theGrid;
 
     /// <unitymethod />
     public void Start()
@@ -41,38 +42,43 @@ namespace NineByteGames.Tdx.Unity
       _itemToTrack = itemToTrack;
 
       _worldGrid = worldGrid;
-      _viewableGrid = new ViewableGrid(_worldGrid, VisibleWidth, VisibleHeight);
-
-      _viewableGrid.GridItemAdded += HandleGridItemAdded;
-      _viewableGrid.GridItemRemoved += HandleGridItemRemoved;
-
-      _viewableGrid.Recenter(Vector2.zero);
+      _theGrid = new ViewableGrid(_worldGrid, VisibleWidth, VisibleHeight);
+      _theGrid.DataChanged += HandleChanged;
+      _theGrid.Initialize(new GridCoordinate(Vector2.zero));
     }
 
-    private void HandleGridItemRemoved(Chunk chunk, GridCoordinate coordinate, GridItem item)
+    private void HandleChanged(ViewableGrid.StoredGridData oldData, ViewableGrid.StoredGridData newData)
     {
-      var existing = _lookup[coordinate];
-      _lookup.Remove(coordinate);
-      // TODO pool it
-      Destroy(existing);
+      GameObject existing;
+      if (_lookup.TryGetValue(oldData.Position, out existing))
+      {
+        // TODO pool it
+        _lookup.Remove(oldData.Position);
+        Destroy(existing);
+      }
 
       Count--;
-    }
 
-    private void HandleGridItemAdded(Chunk chunk, GridCoordinate coordinate, GridItem item)
-    {
-      UpdateSprite(coordinate, item);
+      try
+      {
+        Add(newData.Position, newData.Data);
+      }
+      catch (Exception e)
+      {
+        Console.WriteLine(e);
+      }
     }
 
     /// <unitymethod />
     public void Update()
     {
       var position = _itemToTrack.transform.position;
-      _viewableGrid.Recenter(position);
+      //_viewableGrid.Recenter(position);
+      _theGrid.Recenter(new GridCoordinate(position));
     }
 
     /// <summary> Updates the sprite for the given item at the given position. </summary>
-    private void UpdateSprite(GridCoordinate coordinate, GridItem item)
+    private void Add(GridCoordinate coordinate, GridItem item)
     {
       var tileTemplate = _templates.Tiles.First(t => t.Name == item.Type);
       var template = tileTemplate.Template;

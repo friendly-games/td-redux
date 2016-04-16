@@ -1,208 +1,252 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using UnityEngine;
+using System.Text;
+using Debug = UnityEngine.Debug;
 
 namespace NineByteGames.Tdx.World
 {
+  internal delegate void ViewableGridItemChangedCallback(Chunk chunk, GridCoordinate coordinate, GridItem item);
+
   /// <summary>
-  ///  A view into the WorldGrid that "watches" a specific section of the world
-  ///  grid in order to allow callers to only be interested in the events that
-  ///  occur to that section of the world.  Useful for the UI that is only
-  ///  interested in changes that are currently visible to the user.
+  ///  Takes a portion of the WorldGrid and watches a movable rectangle of units in the world for
+  ///  changes.  Useful for watching the change around the player as he moves.
   /// </summary>
   public sealed class ViewableGrid
   {
-    private readonly int _gridItemsWide;
-    private readonly int _gridItemsHigh;
-    private readonly Array2D<DataStruct> _visibleGridItems;
-    private readonly ViewableChunks _viewableChunks;
+    private readonly WorldGrid _worldGrid;
+    private readonly int _numUnitsWideHalfThreshold;
+    private readonly int _numUnitsHighHalfThreshold;
 
-    private readonly int _gridItemsHighHalf;
-    private readonly int _gridItemsWideHalf;
-
+    private readonly Array2D<StoredGridData> _visibleGridItems;
     private GridCoordinate _currentPosition;
-    private GridCoordinate _lastPosition;
+    private Array2DIndex _viewCurrentPosition;
 
-    public ViewableGrid(WorldGrid worldGrid, int gridItemsWide, int gridItemsHigh)
+    /// <summary> Constructor. </summary>
+    /// <exception cref="ArgumentNullException"> Thrown when one or more required arguments are null. </exception>
+    /// <param name="worldGrid"> The world grid which should provide the grid data to be watched. </param>
+    /// <param name="numUnitsWide"> How many units wide the area that should be watched. </param>
+    /// <param name="numUnitsHigh"> How many units high the area that should be watched. </param>
+    public ViewableGrid(WorldGrid worldGrid, int numUnitsWide, int numUnitsHigh)
     {
-      _gridItemsWide = gridItemsWide;
-      _gridItemsHigh = gridItemsHigh;
+      if (worldGrid == null)
+        throw new ArgumentNullException("worldGrid");
 
-      _gridItemsWideHalf = gridItemsWide / 2;
-      _gridItemsHighHalf = gridItemsHigh / 2;
+      // we always need to be odd isn't that a statement of life)
+      if (numUnitsWide % 2 != 1)
+      {
+        numUnitsWide = numUnitsWide + 1;
+      }
 
-      var numChunksWide = (int)Mathf.Ceil(Mathf.Ceil((float)gridItemsWide / 2.0f) / (float)Chunk.NumberOfGridItemsWide);
-      var numChunksHigh = (int)Mathf.Ceil(Mathf.Ceil((float)gridItemsHigh / 2.0f) / (float)Chunk.NumberOfGridItemsHigh);
+      if (numUnitsHigh % 2 != 1)
+      {
+        numUnitsHigh = numUnitsHigh + 1;
+      }
 
-      _visibleGridItems = new Array2D<DataStruct>(gridItemsWide, gridItemsHigh);
+      // let's make sure we always have valid values
+      numUnitsWide = Math.Max(numUnitsWide, 5);
+      numUnitsHigh = Math.Max(numUnitsHigh, 5);
 
-      _viewableChunks = new ViewableChunks(worldGrid, numChunksWide, numChunksHigh);
-      _viewableChunks.GridItemChanged += HandleChunksItemChanged;
-      _viewableChunks.ViewableChunkChanged += HandleVisibleChunkChanged;
+      _worldGrid = worldGrid;
+      _visibleGridItems = new Array2D<StoredGridData>(numUnitsWide, numUnitsHigh);
+
+      // these are used for converting an array index back into a world coordinate
+      _numUnitsWideHalfThreshold = (_visibleGridItems.Width - 1) / 2;
+      _numUnitsHighHalfThreshold = (_visibleGridItems.Height - 1) / 2;
     }
 
     /// <summary>
-    ///  Event that occurs when a grid item changes.
+    ///  Reads data from the world grid.  Not done in the constructor to allow callers to subscribe to
+    ///  the events that will be fired.
     /// </summary>
-    public event GridItemChangedCallback GridItemChanged;
-
-    private void OnGridItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldValue, GridItem newValue)
+    /// <param name="position"> The position. </param>
+    public void Initialize(GridCoordinate position)
     {
-      var handler = GridItemChanged;
-      if (handler != null)
-        handler(chunk, coordinate, oldValue, newValue);
+      _currentPosition = position;
+      _viewCurrentPosition = ConvertToGridItemIndex(position);
+
+      InitializeUnits();
     }
 
-    private void HandleChunksItemChanged(Chunk chunk, GridCoordinate coordinate, GridItem oldvalue, GridItem newvalue)
+    /// <summary> Initialize each grid unit. </summary>
+    private void InitializeUnits()
     {
-      if (IsWithinViewableArea(coordinate))
+      for (var y = 0; y < _visibleGridItems.Height; y++)
       {
-        OnGridItemChanged(chunk, coordinate, oldvalue, newvalue);
-      }
-    }
-
-    private bool IsWithinViewableArea(GridCoordinate coordinate)
-    {
-      int xDistance = coordinate.X - _currentPosition.X;
-      int yDistance = coordinate.Y - _currentPosition.Y;
-
-      return -_gridItemsWideHalf < xDistance && xDistance < _gridItemsWideHalf
-             && -_gridItemsHighHalf < yDistance && yDistance < _gridItemsHighHalf;
-    }
-
-    private void HandleVisibleChunkChanged(Chunk oldChunk, Chunk newChunk)
-    {
-      if (oldChunk != null)
-      {
-        // TODO remove the items that are now gone
-        for (int y = 0; y < Chunk.NumberOfGridItemsHigh; y++)
+        for (var x = 0; x < _visibleGridItems.Width; x++)
         {
-          for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
-          {
-            var gridCoordinate = new GridCoordinate(oldChunk.Position, new InnerChunkGridCoordinate(x, y));
-            if (IsWithinViewableArea(gridCoordinate))
-            {
-              RemoveItem(oldChunk, gridCoordinate);
-            }
-          }
-        }
-      }
+          var index = new Array2DIndex(x, y);
+          var coordinate = ConvertToGridCoordinate(index);
 
-      if (newChunk != null)
-      {
-        // TODO optimize this only for the new items
-        for (int y = 0; y < Chunk.NumberOfGridItemsHigh; y++)
-        {
-          for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
+          var chunkCoordinate = coordinate.ChunkCoordinate;
+          if (_worldGrid.IsValid(chunkCoordinate))
           {
-            var gridCoordinate = new GridCoordinate(newChunk.Position, new InnerChunkGridCoordinate(x, y));
-            if (IsWithinViewableArea(gridCoordinate))
-            {
-              PutItem(newChunk, gridCoordinate);
-            }
+            var chunk = _worldGrid[chunkCoordinate];
+            var data = chunk[coordinate.InnerChunkGridCoordinate];
+
+            UpdateData(index, data, coordinate);
           }
         }
       }
     }
 
-    private void RemoveItem(Chunk oldChunk, GridCoordinate gridCoordinate)
+    /// <summary> Changes the position being observed. </summary>
+    /// <param name="gridCoordinate"> The new center that should be observed for changes. </param>
+    public void Recenter(GridCoordinate gridCoordinate)
     {
-      int correctedX = MathUtils.PositiveRemainder(gridCoordinate.X, _gridItemsWide);
-      int correctedY = MathUtils.PositiveRemainder(gridCoordinate.Y, _gridItemsHigh);
+      var center = gridCoordinate;
+      _currentPosition = center;
+      _viewCurrentPosition = ConvertToGridItemIndex(_currentPosition);
 
-      var existingDataItem = _visibleGridItems.Swap(correctedX, correctedY, new DataStruct());
+      UpdateUnits();
+    }
 
-      if (existingDataItem.ChunkOwner != null)
+    private void UpdateUnits()
+    {
+      // TODO use diffing to make this more efficient
+
+      for (var y = 0; y < _visibleGridItems.Height; y++)
       {
-        OnGridItemRemoved(existingDataItem.ChunkOwner,
-                          new GridCoordinate(existingDataItem.ChunkOwner.Position, existingDataItem.InnerCoordinate),
-                          oldChunk[gridCoordinate.InnerChunkGridCoordinate]);
+        for (var x = 0; x < _visibleGridItems.Width; x++)
+        {
+          var index = new Array2DIndex(x, y);
+          var coordinate = ConvertToGridCoordinate(index);
+
+          var chunkCoordinate = coordinate.ChunkCoordinate;
+          if (_worldGrid.IsValid(chunkCoordinate))
+          {
+            var existingData = _visibleGridItems[index];
+
+            if (existingData.Position != coordinate)
+            {
+              var chunk = _worldGrid[chunkCoordinate];
+              var data = chunk[coordinate.InnerChunkGridCoordinate];
+              UpdateData(index, data, coordinate);
+            }
+          }
+        }
       }
     }
 
-    private void PutItem(Chunk chunk, GridCoordinate gridCoordinate)
+    /// <summary> Updates the data at the specified index inside the grid. </summary>
+    /// <param name="index"> Zero-based index of the. </param>
+    /// <param name="data"> The grid data to store. </param>
+    /// <param name="position"> The coordinate of the original GridItem where the data was retrieved
+    ///  from. </param>
+    private void UpdateData(Array2DIndex index, GridItem data, GridCoordinate position)
     {
-      int correctedX = MathUtils.PositiveRemainder(gridCoordinate.X, _gridItemsWide);
-      int correctedY = MathUtils.PositiveRemainder(gridCoordinate.Y, _gridItemsHigh);
+      var newData = new StoredGridData()
+                    {
+                      Data = data,
+                      Position = position,
+                    };
 
-      var newDataItem = new DataStruct()
-                        {
-                          ChunkOwner = chunk,
-                          InnerCoordinate = gridCoordinate.InnerChunkGridCoordinate
-                        };
+      var oldData = _visibleGridItems.Swap(index, newData);
 
-      var existingDataItem = _visibleGridItems.Swap(correctedX, correctedY, newDataItem);
+      DataChanged.Invoke(oldData, newData);
+    }
 
-      if (existingDataItem.ChunkOwner == newDataItem.ChunkOwner
-          && existingDataItem.InnerCoordinate == newDataItem.InnerCoordinate)
-      {
+    public event Action<StoredGridData, StoredGridData> DataChanged;
+
+    /// <summary>
+    ///  Converts the given grid coordinate into a an index that can be used to get the data in
+    ///  <see cref="_visibleGridItems"/>.
+    /// </summary>
+    private Array2DIndex ConvertToGridItemIndex(GridCoordinate coordinate)
+    {
+      var correctedX = MathUtils.PositiveRemainder(coordinate.X, _visibleGridItems.Width);
+      var correctedY = MathUtils.PositiveRemainder(coordinate.Y, _visibleGridItems.Height);
+
+      var arrayIndex = new Array2DIndex(correctedX, correctedY);
+
+      return arrayIndex;
+    }
+
+    /// <summary>
+    ///  Converts an array index into the expected grid coordinate for the given index.
+    /// </summary>
+    /// <param name="arrayIndex"> Zero-based index of the array. </param>
+    /// <returns> The given data converted to a grid coordinate. </returns>
+    private GridCoordinate ConvertToGridCoordinate(Array2DIndex arrayIndex)
+    {
+      var difViewX = _viewCurrentPosition.X - arrayIndex.X;
+      var signX = difViewX >= 0 ? 1 : -1;
+
+      // Normalize the offset from the "current" view position.
+      // 
+      // This explanation just talks about X, the same theory holds for Y. Imagine a number line
+      // ranging from 0 to maxViewX).
+      // 
+      // If the current position is on the right (so it's position is maxViewX), then the very left
+      // position (position 0) of the view really just represents one world unit to the right of the
+      // current position.  If we simply subtracted these two positions, however, it would be
+      // reported it as a difference of -ViewWidth units away We want to convert it to a difference
+      // of (1).
+      // 
+      // We know we have to do convert values if it's more than half the size away (that's the only
+      // time that wrapping occurs when putting the values into the view). The conversion is fairly
+      // straight forward when given examples:
+      //  - When we're `maxViewX` view units away, we're really only 1 world unit away.
+      //  - When we're `maxViewX - 1` units away we're really only 2 world units away.
+      //  - When we're `maxViewX - N` units away, we're really only N world units away.
+      // 
+      // The pattern to find N (the world units away) is to take `ViewWidth` and "subtract"
+      // `(maxViewX - N)`. `maxViewX - N` happens to be diffViewX, so then we just have to "subtract"
+      // it from `ViewWidth`. "subtract" is in quotes because actually, when the difference is
+      // negative, we want to add `ViewWidth` (otherwise we end up in very negative territory). So we
+      // add when `maxViewX - N` is negative, subtract when `maxViewX - N` is positive. 
+      var offsetX = Math.Abs(difViewX) > _numUnitsWideHalfThreshold
+        ? difViewX + -signX * _visibleGridItems.Width
+        : difViewX;
+
+      // all of the above but now for Y
+      var difViewY = _viewCurrentPosition.Y - arrayIndex.Y;
+      var signY = difViewY >= 0 ? 1 : -1;
+
+      var offsetY = Math.Abs(difViewY) > _numUnitsHighHalfThreshold
+        ? difViewY + -signY * _visibleGridItems.Height
+        : difViewY;
+
+      var gridPosition = _currentPosition.Offset(-offsetX, -offsetY);
+
+      ValidateConversion(gridPosition, arrayIndex);
+
+      return gridPosition;
+    }
+
+    /// <summary>
+    ///  (Only available in DEBUG builds) Verifies that the conversion from an ArrayIndex to a
+    ///  GridCoordinate was successful.
+    /// </summary>
+    [Conditional("DEBUG")]
+    private void ValidateConversion(GridCoordinate gridPosition, Array2DIndex arrayIndex)
+    {
+      var worked = ConvertToGridItemIndex(gridPosition).X == arrayIndex.X
+                   && ConvertToGridItemIndex(gridPosition).Y == arrayIndex.Y;
+
+      if (worked)
         return;
-      }
 
-      // if the previous item was currently populated, let the listener know that the data is going away
-      if (existingDataItem.ChunkOwner != null)
-      {
-        var existingGridItem = existingDataItem.ChunkOwner[existingDataItem.InnerCoordinate];
-        OnGridItemRemoved(existingDataItem.ChunkOwner,
-                          new GridCoordinate(existingDataItem.ChunkOwner.Position, existingDataItem.InnerCoordinate),
-                          existingGridItem);
-      }
+      // to aid in debugging
+      worked = ConvertToGridItemIndex(gridPosition).X == arrayIndex.X
+               && ConvertToGridItemIndex(gridPosition).Y == arrayIndex.Y;
 
-      // and then let them know about the data that replaced it
-      var item = chunk[gridCoordinate.InnerChunkGridCoordinate];
-      OnGridItemAdded(chunk, gridCoordinate, item);
+      var message = new StringBuilder();
+      message.AppendFormat("Array Index ({0}) was converted into Grid Position ({1})", arrayIndex, gridPosition);
+      message.AppendFormat("But we expected ({0},{1})",
+                           ConvertToGridItemIndex(gridPosition).X,
+                           ConvertToGridItemIndex(gridPosition).Y);
+
+      Debug.Log(message);
     }
 
-    public event GridItemCallback GridItemAdded;
-
-    private void OnGridItemAdded(Chunk chunk, GridCoordinate coordinate, GridItem item)
+    // TODO better figure out what else needs to be done here
+    public struct StoredGridData
     {
-      var handler = GridItemAdded;
-      if (handler != null)
-        handler(chunk, coordinate, item);
-    }
-
-    public event GridItemCallback GridItemRemoved;
-
-    private void OnGridItemRemoved(Chunk chunk, GridCoordinate coordinate, GridItem item)
-    {
-      var handler = GridItemRemoved;
-      if (handler != null)
-        handler(chunk, coordinate, item);
-    }
-
-    public void Recenter(Vector2 position, bool shouldForce = false)
-    {
-      _lastPosition = _currentPosition;
-      _currentPosition = new GridCoordinate(position);
-
-      // this is when chunk-visible callbacks will be invoked.
-      _viewableChunks.Recenter(position);
-
-      foreach (var chunk in _viewableChunks.VisibleChunks.Data)
-      {
-        if (chunk == null)
-          continue;
-
-        for (int y = 0; y < Chunk.NumberOfGridItemsHigh; y++)
-        {
-          for (int x = 0; x < Chunk.NumberOfGridItemsWide; x++)
-          {
-            var gridCoordinate = new GridCoordinate(chunk.Position, new InnerChunkGridCoordinate(x, y));
-            if (IsWithinViewableArea(gridCoordinate))
-            {
-              PutItem(chunk, gridCoordinate);
-            }
-          }
-        }
-      }
-    }
-
-    private struct DataStruct
-    {
-      public Chunk ChunkOwner;
-      public InnerChunkGridCoordinate InnerCoordinate;
+      public Chunk Chunk;
+      public GridCoordinate Position;
+      public GridItem Data;
     }
   }
 }

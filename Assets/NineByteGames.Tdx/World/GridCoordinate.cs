@@ -29,6 +29,12 @@ namespace NineByteGames.Tdx.World
       Y = (int)Mathf.Floor(position.y);
     }
 
+    /// <summary> Create a new GridCoordinate that adds the given offset to this coordinate. </summary>
+    public GridCoordinate Offset(int x, int y)
+    {
+      return new GridCoordinate(X + x, Y + y);
+    }
+
     public Vector2 ToUpperRight(Vector2 offset)
     {
       return new Vector2(offset.x + X, offset.y + Y);
