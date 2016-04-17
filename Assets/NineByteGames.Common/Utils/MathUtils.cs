@@ -14,5 +14,12 @@ namespace NineByteGames.Common.Utils
     {
       return ((value % divisor) + divisor) % divisor;
     }
+
+    public static void Swap<T>(ref T leftValue, ref T rightValue)
+    {
+      var temp = leftValue;
+      leftValue = rightValue;
+      rightValue = temp;
+    }
   }
 }

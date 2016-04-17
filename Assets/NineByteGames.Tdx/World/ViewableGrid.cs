@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using NineByteGames.Common.Utils;
 using Debug = UnityEngine.Debug;
 
 namespace NineByteGames.Tdx.World
@@ -93,40 +94,134 @@ namespace NineByteGames.Tdx.World
 
     /// <summary> Changes the position being observed. </summary>
     /// <param name="gridCoordinate"> The new center that should be observed for changes. </param>
-    public void Recenter(GridCoordinate gridCoordinate)
+    public void Recenter(GridCoordinate center)
     {
-      var center = gridCoordinate;
+      var originalPosition = _currentPosition;
+
       _currentPosition = center;
       _viewCurrentPosition = ConvertToGridItemIndex(_currentPosition);
 
-      UpdateUnits();
+      UpdateChangedUnits(originalPosition);
     }
 
-    private void UpdateUnits()
+    /// <summary> Updates the cells that have changed because the target has changed. </summary>
+    /// <param name="previousCoordinate"> The last position we were at. </param>
+    private void UpdateChangedUnits(GridCoordinate previousCoordinate)
     {
-      // TODO use diffing to make this more efficient
+      int xDiff = _currentPosition.X - previousCoordinate.X;
+      int yDiff = _currentPosition.Y - previousCoordinate.Y;
 
-      for (var y = 0; y < _visibleGridItems.Height; y++)
+      if (Math.Abs(xDiff) >= _visibleGridItems.Width
+          || Math.Abs(yDiff) >= _visibleGridItems.Height
+          )
       {
-        for (var x = 0; x < _visibleGridItems.Width; x++)
+        // if we ever move more units than we have, then just invalidate the whole thing. 
+        UpdateAllUnits();
+        return;
+      }
+
+      // if we're at (x,y) from (x-1, y-1), then (x+halfWidth, y+halfHeight) just came into view (of
+      // course if we just came from (x+1, y+1), then (x-halfWidth, y-halfWidth) just came into view.
+      int amountToOffsetX = GetSigned(xDiff, _numUnitsWideHalfThreshold);
+      int amountToOffsetY = GetSigned(yDiff, _numUnitsHighHalfThreshold);
+
+      var start = previousCoordinate.Offset(amountToOffsetX, amountToOffsetY);
+      var end = _currentPosition.Offset(amountToOffsetX, amountToOffsetY);
+
+      var startColumn = start.X;
+      var endColumn = end.X;
+
+      // make sure our for loop will work :: )
+      if (startColumn > endColumn)
+      {
+        MathUtils.Swap(ref startColumn, ref endColumn);
+      }
+
+      int startRow = start.Y;
+      int endRow = end.Y;
+
+      if (startRow > endRow)
+      {
+        MathUtils.Swap(ref startRow, ref endRow);
+      }
+
+      // OPTIMIZATION 1 - Instead of using PositiveRemainder, we could just have loop through twice
+      // (when needed) because we know that we can only have to dis-jointed sets of rows[/columns]
+      // 
+      // OPTIMIZATION 2 - We're currently always hitting the area where the rows/columns overlap
+      // twice.  We could optimize this out (especially if/when we do #1 above). 
+
+      // update the rows that need to be updated
+      for (int y = startRow; y <= endRow; y++)
+      {
+        for (int x = _currentPosition.X - _numUnitsWideHalfThreshold; x <= _currentPosition.X + _numUnitsWideHalfThreshold; x++)
         {
-          var index = new Array2DIndex(x, y);
-          var coordinate = ConvertToGridCoordinate(index);
-
-          var chunkCoordinate = coordinate.ChunkCoordinate;
-          if (_worldGrid.IsValid(chunkCoordinate))
-          {
-            var existingData = _visibleGridItems[index];
-
-            if (existingData.Position != coordinate)
-            {
-              var chunk = _worldGrid[chunkCoordinate];
-              var data = chunk[coordinate.InnerChunkGridCoordinate];
-              UpdateData(index, data, coordinate);
-            }
-          }
+          InvalidatePosition(new GridCoordinate(x, y));
         }
       }
+
+      // update that columns that need to be updated
+      for (int y = _currentPosition.Y - _numUnitsHighHalfThreshold; y <= _currentPosition.Y + _numUnitsHighHalfThreshold; y++)
+      {
+        for (int x = startColumn; x <= endColumn; x++)
+        {
+          InvalidatePosition(new GridCoordinate(x, y));
+        }
+      }
+    }
+
+    /// <summary> Updates every item in our viewable grid. </summary>
+    private void UpdateAllUnits()
+    {
+      for (int y = 0; y < _visibleGridItems.Height; y++)
+      {
+        for (int x = 0; x < _visibleGridItems.Width; x++)
+        {
+          InvalidateIndex(new Array2DIndex(x, y));
+        }
+      }
+    }
+
+    /// <summary>
+    ///  Checks the array index/position to verify that it has the correct position information and if
+    ///  it does not, re-reads the data from the world and updates the data.
+    /// </summary>
+    /// <param name="coordinate"> The coordinate representing the position to update. </param>
+    private void InvalidatePosition(GridCoordinate coordinate)
+    {
+      Invalidate(ConvertToGridItemIndex(coordinate), coordinate);
+    }
+
+    /// <summary>
+    ///  Checks the array index/position to verify that it has the correct position information and if
+    ///  it does not, re-reads the data from the world and updates the data.
+    /// </summary>
+    /// <param name="index"> The index position to update. </param>
+    private void InvalidateIndex(Array2DIndex index)
+    {
+      Invalidate(index, ConvertToGridCoordinate(index));
+    }
+
+    /// <summary>
+    ///  Checks the array index/position to verify that it has the correct position information and if
+    ///  it does not, re-reads the data from the world and updates the data.
+    /// </summary>
+    /// <param name="index"> The index position to update. </param>
+    /// <param name="coordinate"> The coordinate representing the position to update. </param>
+    private void Invalidate(Array2DIndex index, GridCoordinate coordinate)
+    {
+      var existingData = _visibleGridItems[index];
+
+      if (existingData.Position == coordinate)
+        return;
+      var chunkCoordinate = coordinate.ChunkCoordinate;
+
+      if (!_worldGrid.IsValid(chunkCoordinate))
+        return;
+
+      var chunk = _worldGrid[chunkCoordinate];
+      var data = chunk[coordinate.InnerChunkGridCoordinate];
+      UpdateData(index, data, coordinate);
     }
 
     /// <summary> Updates the data at the specified index inside the grid. </summary>
@@ -153,6 +248,15 @@ namespace NineByteGames.Tdx.World
     ///  Converts the given grid coordinate into a an index that can be used to get the data in
     ///  <see cref="_visibleGridItems"/>.
     /// </summary>
+    /// <remarks>
+    ///  Multiple GridCoordinates map to the same ArrayIndex, so this is technically an irreversible
+    ///  operation. However, provided we always remain within the correct GridCoordinates (e.g. always
+    ///  use grid coordinates that we generate or which are validated first), we should never really
+    ///  have a situation where a conversion to an array index and back results in a different
+    ///  coordinate.
+    /// </remarks>
+    /// <param name="coordinate"> The coordinate. </param>
+    /// <returns> The given data converted to a grid item index. </returns>
     private Array2DIndex ConvertToGridItemIndex(GridCoordinate coordinate)
     {
       var correctedX = MathUtils.PositiveRemainder(coordinate.X, _visibleGridItems.Width);
@@ -171,7 +275,7 @@ namespace NineByteGames.Tdx.World
     private GridCoordinate ConvertToGridCoordinate(Array2DIndex arrayIndex)
     {
       var difViewX = _viewCurrentPosition.X - arrayIndex.X;
-      var signX = difViewX >= 0 ? 1 : -1;
+      var signX = GetSign(difViewX);
 
       // Normalize the offset from the "current" view position.
       // 
@@ -213,6 +317,16 @@ namespace NineByteGames.Tdx.World
       ValidateConversion(gridPosition, arrayIndex);
 
       return gridPosition;
+    }
+
+    private static int GetSign(int difViewX)
+    {
+      return GetSigned(difViewX, 1);
+    }
+
+    private static int GetSigned(int originalValue, int inverted)
+    {
+      return originalValue >= 0 ? inverted : -inverted;
     }
 
     /// <summary>

@@ -52,6 +52,8 @@ namespace NineByteGames.Tdx.Unity
       GameObject existing;
       if (_lookup.TryGetValue(oldData.Position, out existing))
       {
+        // TODO check if it's actually valid data
+
         // TODO pool it
         _lookup.Remove(oldData.Position);
         Destroy(existing);
@@ -59,14 +61,7 @@ namespace NineByteGames.Tdx.Unity
 
       Count--;
 
-      try
-      {
-        Add(newData.Position, newData.Data);
-      }
-      catch (Exception e)
-      {
-        Console.WriteLine(e);
-      }
+      Add(newData.Position, newData.Data);
     }
 
     /// <unitymethod />
