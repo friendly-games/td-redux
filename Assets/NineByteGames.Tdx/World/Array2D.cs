@@ -21,8 +21,8 @@ namespace NineByteGames.Tdx.World
 
     public T this[int x, int y]
     {
-      get { return Data[CalculateIndex(x, y)]; }
-      set { Data[CalculateIndex(x, y)] = value; }
+      get { return Data[CalculateRawArrayIndex(x, y)]; }
+      set { Data[CalculateRawArrayIndex(x, y)] = value; }
     }
 
     public T this[Array2DIndex index]
@@ -40,7 +40,7 @@ namespace NineByteGames.Tdx.World
     /// <summary> Gets the existing value at the specified index and returns the old value.  </summary>
     public T Swap(int x, int y, T newValue)
     {
-      var index = CalculateIndex(x, y);
+      var index = CalculateRawArrayIndex(x, y);
 
       var existing = Data[index];
       Data[index] = newValue;
@@ -53,9 +53,14 @@ namespace NineByteGames.Tdx.World
       return Swap(index.X, index.Y, newValue);
     }
 
-    private int CalculateIndex(int x, int y)
+    public int CalculateRawArrayIndex(int x, int y)
     {
       return y * Width + x;
+    }
+
+    public int CalculateRawArrayIndex(Array2DIndex index)
+    {
+      return CalculateRawArrayIndex(index.X, index.Y);
     }
   }
 

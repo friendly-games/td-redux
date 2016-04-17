@@ -8,19 +8,17 @@ using Debug = UnityEngine.Debug;
 
 namespace NineByteGames.Tdx.World
 {
-  internal delegate void ViewableGridItemChangedCallback(Chunk chunk, GridCoordinate coordinate, GridItem item);
-
   /// <summary>
   ///  Takes a portion of the WorldGrid and watches a movable rectangle of units in the world for
   ///  changes.  Useful for watching the change around the player as he moves.
   /// </summary>
-  public sealed class ViewableGrid
+  public sealed class ViewableGrid<T>
   {
     private readonly WorldGrid _worldGrid;
     private readonly int _numUnitsWideHalfThreshold;
     private readonly int _numUnitsHighHalfThreshold;
 
-    private readonly Array2D<StoredGridData> _visibleGridItems;
+    private readonly Array2D<StoredGridData<T>> _visibleGridItems;
     private GridCoordinate _currentPosition;
     private Array2DIndex _viewCurrentPosition;
 
@@ -50,7 +48,7 @@ namespace NineByteGames.Tdx.World
       numUnitsHigh = Math.Max(numUnitsHigh, 5);
 
       _worldGrid = worldGrid;
-      _visibleGridItems = new Array2D<StoredGridData>(numUnitsWide, numUnitsHigh);
+      _visibleGridItems = new Array2D<StoredGridData<T>>(numUnitsWide, numUnitsHigh);
 
       // these are used for converting an array index back into a world coordinate
       _numUnitsWideHalfThreshold = (_visibleGridItems.Width - 1) / 2;
@@ -86,14 +84,13 @@ namespace NineByteGames.Tdx.World
             var chunk = _worldGrid[chunkCoordinate];
             var data = chunk[coordinate.InnerChunkGridCoordinate];
 
-            UpdateData(index, data, coordinate);
+            UpdateData(index, data, coordinate, chunk);
           }
         }
       }
     }
 
     /// <summary> Changes the position being observed. </summary>
-    /// <param name="gridCoordinate"> The new center that should be observed for changes. </param>
     public void Recenter(GridCoordinate center)
     {
       var originalPosition = _currentPosition;
@@ -113,7 +110,7 @@ namespace NineByteGames.Tdx.World
 
       if (Math.Abs(xDiff) >= _visibleGridItems.Width
           || Math.Abs(yDiff) >= _visibleGridItems.Height
-          )
+        )
       {
         // if we ever move more units than we have, then just invalidate the whole thing. 
         UpdateAllUnits();
@@ -154,14 +151,18 @@ namespace NineByteGames.Tdx.World
       // update the rows that need to be updated
       for (int y = startRow; y <= endRow; y++)
       {
-        for (int x = _currentPosition.X - _numUnitsWideHalfThreshold; x <= _currentPosition.X + _numUnitsWideHalfThreshold; x++)
+        for (int x = _currentPosition.X - _numUnitsWideHalfThreshold;
+             x <= _currentPosition.X + _numUnitsWideHalfThreshold;
+             x++)
         {
           InvalidatePosition(new GridCoordinate(x, y));
         }
       }
 
       // update that columns that need to be updated
-      for (int y = _currentPosition.Y - _numUnitsHighHalfThreshold; y <= _currentPosition.Y + _numUnitsHighHalfThreshold; y++)
+      for (int y = _currentPosition.Y - _numUnitsHighHalfThreshold;
+           y <= _currentPosition.Y + _numUnitsHighHalfThreshold;
+           y++)
       {
         for (int x = startColumn; x <= endColumn; x++)
         {
@@ -221,28 +222,29 @@ namespace NineByteGames.Tdx.World
 
       var chunk = _worldGrid[chunkCoordinate];
       var data = chunk[coordinate.InnerChunkGridCoordinate];
-      UpdateData(index, data, coordinate);
+      UpdateData(index, data, coordinate, chunk);
     }
 
     /// <summary> Updates the data at the specified index inside the grid. </summary>
     /// <param name="index"> Zero-based index of the. </param>
     /// <param name="data"> The grid data to store. </param>
     /// <param name="position"> The coordinate of the original GridItem where the data was retrieved
-    ///  from. </param>
-    private void UpdateData(Array2DIndex index, GridItem data, GridCoordinate position)
+    ///   from. </param>
+    /// <param name="chunk"></param>
+    private void UpdateData(Array2DIndex index, GridItem data, GridCoordinate position, Chunk chunk)
     {
-      var newData = new StoredGridData()
-                    {
-                      Data = data,
-                      Position = position,
-                    };
+      var newData = new StoredGridData<T>(chunk, position, data, default(T));
+      var rawIndex = _visibleGridItems.CalculateRawArrayIndex(index);
 
-      var oldData = _visibleGridItems.Swap(index, newData);
+      var oldData = _visibleGridItems.Data[rawIndex];
+      _visibleGridItems.Data[rawIndex] = newData;
 
-      DataChanged.Invoke(oldData, newData);
+      DataChanged.Invoke(oldData, ref _visibleGridItems.Data[rawIndex]);
     }
 
-    public event Action<StoredGridData, StoredGridData> DataChanged;
+    public delegate void Callback(StoredGridData<T> oldData, ref StoredGridData<T> newData);
+
+    public event Callback DataChanged;
 
     /// <summary>
     ///  Converts the given grid coordinate into a an index that can be used to get the data in
@@ -354,13 +356,30 @@ namespace NineByteGames.Tdx.World
 
       Debug.Log(message);
     }
+  }
 
-    // TODO better figure out what else needs to be done here
-    public struct StoredGridData
+  /// <summary> Data that is stored for each unit inside of a ViewableGrid </summary>
+  /// <typeparam name="T"> The type of additional data stored by the consumer of the ViewableGrid. </typeparam>
+  public struct StoredGridData<T>
+  {
+    public StoredGridData(Chunk chunk, GridCoordinate position, GridItem gridItem, T data)
     {
-      public Chunk Chunk;
-      public GridCoordinate Position;
-      public GridItem Data;
+      Chunk = chunk;
+      Position = position;
+      GridItem = gridItem;
+      Data = data;
     }
+
+    /// <summary> The chunk that the datum belongs to. </summary>
+    public readonly Chunk Chunk;
+
+    /// <summary> The position of the unit in the WorldGrid for which this data is valid.. </summary>
+    public readonly GridCoordinate Position;
+
+    /// <summary> The actual GridItem data stored here. </summary>
+    public readonly GridItem GridItem;
+
+    /// <summary> The unit specific data. </summary>
+    public T Data;
   }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 using UnityEngine;
 
 namespace NineByteGames.Tdx.World
@@ -35,6 +36,7 @@ namespace NineByteGames.Tdx.World
       return new GridCoordinate(X + x, Y + y);
     }
 
+    [Pure]
     public Vector2 ToUpperRight(Vector2 offset)
     {
       return new Vector2(offset.x + X, offset.y + Y);
