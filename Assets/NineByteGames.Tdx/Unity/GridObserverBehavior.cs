@@ -23,8 +23,7 @@ namespace NineByteGames.Tdx.Unity
     public int VisibleWidth = 40;
     public int VisibleHeight = 40;
 
-    public int Count;
-    private ViewableGrid<GameObject> _theGrid;
+    private WorldGridSlice<GameObject> _theGridSlice;
 
     /// <unitymethod />
     public void Start()
@@ -46,12 +45,12 @@ namespace NineByteGames.Tdx.Unity
       _itemToTrack = itemToTrack;
 
       _worldGrid = worldGrid;
-      _theGrid = new ViewableGrid<GameObject>(_worldGrid, VisibleWidth, VisibleHeight);
-      _theGrid.DataChanged += HandleChanged;
-      _theGrid.Initialize(new GridCoordinate(Vector2.zero));
+      _theGridSlice = new WorldGridSlice<GameObject>(_worldGrid, VisibleWidth, VisibleHeight);
+      _theGridSlice.DataChanged += HandleChanged;
+      _theGridSlice.Initialize(new GridCoordinate(Vector2.zero));
     }
 
-    private void HandleChanged(StoredGridData<GameObject> oldData, ref StoredGridData<GameObject> newData)
+    private void HandleChanged(SliceUnitData<GameObject> oldData, ref SliceUnitData<GameObject> newData)
     {
       if (oldData.Data != null)
       {
@@ -72,7 +71,7 @@ namespace NineByteGames.Tdx.Unity
     public void Update()
     {
       var position = _itemToTrack.transform.position;
-      _theGrid.Recenter(new GridCoordinate(position));
+      _theGridSlice.Recenter(new GridCoordinate(position));
     }
   }
 }
