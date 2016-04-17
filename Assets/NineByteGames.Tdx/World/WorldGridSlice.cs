@@ -12,6 +12,12 @@ namespace NineByteGames.Tdx.World
   ///  Takes a portion of the WorldGrid and watches a movable rectangle of units in the world for
   ///  changes.  Useful for watching the change around the player as he moves.
   /// </summary>
+  /// <remarks>
+  ///  This class uses a rolling buffer to only update the tiles that changed.  This means that when
+  ///  the player moves right, the left-most row is removed and replaced with the row that came into
+  ///  view on the right.
+  /// </remarks>
+  /// <typeparam name="T"> Generic type parameter. </typeparam>
   public sealed class WorldGridSlice<T>
   {
     private readonly WorldGrid _worldGrid;
@@ -105,8 +111,13 @@ namespace NineByteGames.Tdx.World
     /// <param name="previousCoordinate"> The last position we were at. </param>
     private void UpdateChangedUnits(GridCoordinate previousCoordinate)
     {
-      int xDiff = _currentPosition.X - previousCoordinate.X;
-      int yDiff = _currentPosition.Y - previousCoordinate.Y;
+      var xDiff = _currentPosition.X - previousCoordinate.X;
+      var yDiff = _currentPosition.Y - previousCoordinate.Y;
+
+      if (xDiff == 0 && yDiff == 0)
+      {
+        return;
+      }
 
       if (Math.Abs(xDiff) >= _visibleGridItems.Width
           || Math.Abs(yDiff) >= _visibleGridItems.Height
@@ -119,8 +130,16 @@ namespace NineByteGames.Tdx.World
 
       // if we're at (x,y) from (x-1, y-1), then (x+halfWidth, y+halfHeight) just came into view (of
       // course if we just came from (x+1, y+1), then (x-halfWidth, y-halfWidth) just came into view.
-      int amountToOffsetX = GetSigned(xDiff, _numUnitsWideHalfThreshold);
-      int amountToOffsetY = GetSigned(yDiff, _numUnitsHighHalfThreshold);
+
+      // This used to be `amountToOffsetX = MathUtils.Signed(xDiff, _numUnitsWideHalfThreshold)` but
+      // then when we moved right it would update the top-right corner one higher than when we moved
+      // up. I'm not sure why we need to invalidate one higher when moving in the positive direction
+      // but it seems to work.
+      // 
+      // My current theory as to why is that it has something to do with one of the conversion
+      // algorithms preferring the positive direction over the negative. 
+      var amountToOffsetX = xDiff > 0 ? _numUnitsWideHalfThreshold + 1 : -_numUnitsWideHalfThreshold;
+      var amountToOffsetY = yDiff > 0 ? _numUnitsHighHalfThreshold + 1 : -_numUnitsHighHalfThreshold;
 
       var start = previousCoordinate.Offset(amountToOffsetX, amountToOffsetY);
       var end = _currentPosition.Offset(amountToOffsetX, amountToOffsetY);
@@ -134,8 +153,8 @@ namespace NineByteGames.Tdx.World
         MathUtils.Swap(ref startColumn, ref endColumn);
       }
 
-      int startRow = start.Y;
-      int endRow = end.Y;
+      var startRow = start.Y;
+      var endRow = end.Y;
 
       if (startRow > endRow)
       {
@@ -149,9 +168,9 @@ namespace NineByteGames.Tdx.World
       // twice.  We could optimize this out (especially if/when we do #1 above). 
 
       // update the rows that need to be updated
-      for (int y = startRow; y <= endRow; y++)
+      for (var y = startRow; y < endRow; y++)
       {
-        for (int x = _currentPosition.X - _numUnitsWideHalfThreshold;
+        for (var x = _currentPosition.X - _numUnitsWideHalfThreshold;
              x <= _currentPosition.X + _numUnitsWideHalfThreshold;
              x++)
         {
@@ -160,11 +179,11 @@ namespace NineByteGames.Tdx.World
       }
 
       // update that columns that need to be updated
-      for (int y = _currentPosition.Y - _numUnitsHighHalfThreshold;
+      for (var y = _currentPosition.Y - _numUnitsHighHalfThreshold;
            y <= _currentPosition.Y + _numUnitsHighHalfThreshold;
            y++)
       {
-        for (int x = startColumn; x <= endColumn; x++)
+        for (var x = startColumn; x < endColumn; x++)
         {
           InvalidatePosition(new GridCoordinate(x, y));
         }
@@ -174,12 +193,25 @@ namespace NineByteGames.Tdx.World
     /// <summary> Updates every item in our viewable grid. </summary>
     private void UpdateAllUnits()
     {
-      for (int y = 0; y < _visibleGridItems.Height; y++)
+      for (var y = 0; y < _visibleGridItems.Height; y++)
       {
-        for (int x = 0; x < _visibleGridItems.Width; x++)
+        for (var x = 0; x < _visibleGridItems.Width; x++)
         {
           InvalidateIndex(new Array2DIndex(x, y));
         }
+      }
+    }
+
+    private void Validate(GridCoordinate coordinate)
+    {
+      var index = ConvertToGridItemIndex(coordinate);
+      var backAgain = ConvertToGridCoordinate(index);
+
+      if (backAgain != coordinate)
+      {
+        var builder = new StringBuilder();
+        builder.AppendFormat("Expected: {0}, but got {1}", coordinate, backAgain);
+        Debug.LogError(builder);
       }
     }
 
@@ -190,6 +222,7 @@ namespace NineByteGames.Tdx.World
     /// <param name="coordinate"> The coordinate representing the position to update. </param>
     private void InvalidatePosition(GridCoordinate coordinate)
     {
+      Validate(coordinate);
       Invalidate(ConvertToGridItemIndex(coordinate), coordinate);
     }
 
