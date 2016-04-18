@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace NineByteGames.Tdx.World
 {
@@ -52,9 +53,6 @@ namespace NineByteGames.Tdx.World
 
       // TODO do this elsewhere
 
-      var dirt = new GridItem(TileType.Path);
-      var water = new GridItem(TileType.Water);
-
       for (int y = 0; y < NumberOfGridItemsHigh; y++)
       {
         for (int x = 0; x < NumberOfGridItemsWide; x++)
@@ -63,13 +61,19 @@ namespace NineByteGames.Tdx.World
           // TODO load this from somewhere else
           var value = Mathf.PerlinNoise(gridPosition.X / 10f, gridPosition.Y / 10f);
 
+          byte variant = (byte)(Random.value * 4);
+
           if (value > 0.7f)
           {
-            this[new InnerChunkGridCoordinate(x, y)] = water;
+            this[new InnerChunkGridCoordinate(x, y)] = new GridItem(TileType.Water, variant);
+          }
+          else if (value < 0.3f)
+          {
+            this[new InnerChunkGridCoordinate(x, y)] = new GridItem(TileType.Hill, variant);
           }
           else
           {
-            this[new InnerChunkGridCoordinate(x, y)] = dirt;
+            this[new InnerChunkGridCoordinate(x, y)] = new GridItem(TileType.Path, variant);
           }
         }
       }

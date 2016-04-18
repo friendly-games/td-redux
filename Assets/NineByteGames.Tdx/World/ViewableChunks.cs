@@ -147,19 +147,4 @@ namespace NineByteGames.Tdx.World
         handler(oldchunk, newchunk);
     }
   }
-
-  /// <summary> An item that takes up one position in the world grid. </summary>
-  public struct GridItem
-  {
-    public GridItem(TileType type)
-    {
-      Type = type;
-      ViewData = null;
-    }
-
-    /// <summary> The type of tile that the grid item represents. </summary>
-    public TileType Type;
-
-    public object ViewData;
-  }
 }

@@ -64,6 +64,8 @@ namespace NineByteGames.Tdx.Unity
       var instance = tileTemplatePool.Get();
       instance.transform.position = newData.Position.ToUpperRight(Vector2.zero);
 
+      instance.transform.rotation = Quaternion.Euler(0, 0, item.Variant * 90);
+
       newData.Data = instance;
     }
 

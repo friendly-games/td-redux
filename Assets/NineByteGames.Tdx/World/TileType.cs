@@ -10,6 +10,7 @@ namespace NineByteGames.Tdx.World
     /// <summary> Special cased to indicate that no tile is present. </summary>
     None,
     Water,
-    Path
+    Path,
+    Hill,
   }
 }
