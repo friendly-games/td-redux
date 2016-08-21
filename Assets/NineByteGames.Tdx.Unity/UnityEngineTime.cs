@@ -6,6 +6,9 @@ using UnityEngine;
 
 namespace NineByteGames.Tdx.Unity
 {
+  /// <summary>
+  ///  Implementation of <see cref="IEngineObject"/> that uses unity's time system.
+  /// </summary>
   internal class UnityEngineTime : IEngineTime
   {
     public static readonly UnityEngineTime Instance

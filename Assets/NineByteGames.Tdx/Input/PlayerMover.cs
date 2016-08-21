@@ -6,18 +6,6 @@ using UnityEngine;
 
 namespace NineByteGames.Tdx.Input
 {
-  /// <summary> Represents a single-player in the engine. </summary>
-  public interface IEngineObject
-  {
-    Vector3 Position { get; set; }
-  }
-
-  /// <summary> Represents the time in the engine. </summary>
-  public interface IEngineTime
-  {
-    float DeltaTime { get; }
-  }
-
   /// <summary> A player mover. </summary>
   public class PlayerMover
   {
@@ -58,9 +46,8 @@ namespace NineByteGames.Tdx.Input
       }
     }
 
-    /// <summary> Find the desired movment for the user. </summary>
-    /// <returns> A Vector3. </returns>
-    public Vector3 CheckMovementInput()
+    /// <summary> Calculate the player's non-normalized desired velocity. </summary>
+    private Vector3 CheckMovementInput()
     {
       var desiredVelocity = new DesiredVelocity();
 
