@@ -15,6 +15,12 @@ namespace NineByteGames.Common
       instance.transform.parent = parent.transform;
     }
 
+    /// <summary> Gets the parent of the given game object </summary>
+    public static Transform GetParent(this GameObject instance)
+    {
+      return instance.transform.parent;
+    }
+
     /// <summary> Create a copy of the given object. </summary>
     public static GameObject Clone(this GameObject instance)
     {
