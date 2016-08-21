@@ -30,9 +30,10 @@ namespace NineByteGames.Tdx.Unity
     {
       _templates = GetComponent<TemplatesBehavior>();
 
-      _pools = _templates.Tiles
-                         .ToDictionary(t => t.Name,
-                                       t => new UnityObjectPool(t.Template, gameObject, VisibleHeight * VisibleHeight));
+      _pools = _templates.TemplatesLookup
+                         .CreateLookup<TileType, UnityObjectPool>(
+                           "TileTemplate",
+                           it => new UnityObjectPool(it, gameObject, 50));
 
       // TODO get the grid from elsewhere
       // TODO don't use the camera
