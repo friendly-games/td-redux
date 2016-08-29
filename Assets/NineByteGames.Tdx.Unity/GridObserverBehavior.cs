@@ -18,22 +18,37 @@ namespace NineByteGames.Tdx.Unity
     private WorldGrid _worldGrid;
     private Camera _itemToTrack;
 
-    private Dictionary<TileType, UnityObjectPool> _pools;
+    private Dictionary<TileType, UnityObjectPool> _tilePools;
+    private Dictionary<BuildingType, UnityObjectPool> _buildingPools;
 
     public int VisibleWidth = 40;
     public int VisibleHeight = 40;
 
-    private WorldGridSlice<GameObject> _theGridSlice;
+    public GameObject TilesParent;
+    public GameObject BuildingsParent;
+
+    private WorldGridSlice<ViewGridItemData> _theGridSlice;
 
     /// <unitymethod />
     public void Start()
     {
       _templates = GetComponent<TemplatesBehavior>();
 
-      _pools = _templates.TemplatesLookup
-                         .CreateLookup<TileType, UnityObjectPool>(
-                           "TileTemplate",
-                           it => new UnityObjectPool(it, gameObject, 50));
+      _tilePools = _templates.TemplatesLookup
+                             .CreateLookup<TileType, UnityObjectPool>(
+                               "TileTemplate",
+                               it =>
+                                 new UnityObjectPool(it,
+                                                     TilesParent,
+                                                     Chunk.NumberOfGridItemsHigh * Chunk.NumberOfGridItemsWide));
+
+      _buildingPools = _templates.TemplatesLookup
+                                 .CreateLookup<BuildingType, UnityObjectPool>(
+                                   "Template",
+                                   it =>
+                                     new UnityObjectPool(it,
+                                                         BuildingsParent,
+                                                         Chunk.NumberOfGridItemsWide));
 
       // TODO get the grid from elsewhere
       // TODO don't use the camera
@@ -46,28 +61,44 @@ namespace NineByteGames.Tdx.Unity
       _itemToTrack = itemToTrack;
 
       _worldGrid = worldGrid;
-      _theGridSlice = new WorldGridSlice<GameObject>(_worldGrid, VisibleWidth, VisibleHeight);
+      _theGridSlice = new WorldGridSlice<ViewGridItemData>(_worldGrid, VisibleWidth, VisibleHeight);
       _theGridSlice.DataChanged += HandleChanged;
       _theGridSlice.Initialize(new GridCoordinate(Vector2.zero));
     }
 
-    private void HandleChanged(SliceUnitData<GameObject> oldData, ref SliceUnitData<GameObject> newData)
+    private void HandleChanged(SliceUnitData<ViewGridItemData> oldData, ref SliceUnitData<ViewGridItemData> newData)
     {
-      if (oldData.Data != null)
+      if (oldData.Data.IsValid)
       {
-        UnityObjectPool pool = _pools[oldData.GridItem.Type];
-        pool.Restore(oldData.Data);
+        UnityObjectPool tilePool = _tilePools[oldData.GridItem.Type];
+        tilePool.Restore(oldData.Data.Tile);
+
+        if (oldData.GridItem.BuildingType != BuildingType.None)
+        {
+          UnityObjectPool buildingPool = _buildingPools[oldData.GridItem.BuildingType];
+          buildingPool.Restore(oldData.Data.Building);
+        }
       }
 
       GridItem item = newData.GridItem;
-      var tileTemplatePool = _pools[item.Type];
+      UnityObjectPool tileTemplatePool = _tilePools[item.Type];
 
-      var instance = tileTemplatePool.Get();
-      instance.transform.position = newData.Position.ToUpperRight(Vector2.zero);
+      GameObject tileInstance = tileTemplatePool.Get();
+      tileInstance.transform.position = newData.Position.ToUpperRight(Vector2.zero);
+      tileInstance.transform.rotation = Quaternion.Euler(0, 0, item.Variant * 90);
 
-      instance.transform.rotation = Quaternion.Euler(0, 0, item.Variant * 90);
+      var newInstance = new ViewGridItemData();
+      newInstance.Tile = tileInstance;
 
-      newData.Data = instance;
+      if (newData.GridItem.BuildingType != BuildingType.None)
+      {
+        UnityObjectPool buildingPool = _buildingPools[newData.GridItem.BuildingType];
+        var buildingInstance = buildingPool.Get();
+        buildingInstance.transform.position = newData.Position.ToUpperRight(Vector2.zero);
+        newInstance.Building = buildingInstance;
+      }
+
+      newData.Data = newInstance;
     }
 
     /// <unitymethod />
@@ -75,6 +106,17 @@ namespace NineByteGames.Tdx.Unity
     {
       var position = _itemToTrack.transform.position;
       _theGridSlice.Recenter(new GridCoordinate(position));
+    }
+
+    private struct ViewGridItemData
+    {
+      public GameObject Tile;
+      public GameObject Building;
+
+      public bool IsValid
+      {
+        get { return Tile != null; }
+      }
     }
   }
 }

@@ -23,7 +23,7 @@ namespace NineByteGames.Tdx.Unity.View
       _healthRect = HealthView.GetComponent<RectTransform>();
       _parentRect = HealthView.GetParent().GetComponent<RectTransform>();
 
-      SetHealth(.20f);
+      SetHealth(1.0f);
     }
 
     public void SetHealth(float health)

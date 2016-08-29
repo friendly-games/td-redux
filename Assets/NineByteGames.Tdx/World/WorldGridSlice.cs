@@ -121,7 +121,7 @@ namespace NineByteGames.Tdx.World
 
       if (Math.Abs(xDiff) >= _visibleGridItems.Width
           || Math.Abs(yDiff) >= _visibleGridItems.Height
-        )
+      )
       {
         // if we ever move more units than we have, then just invalidate the whole thing. 
         UpdateAllUnits();

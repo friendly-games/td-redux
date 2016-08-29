@@ -58,25 +58,45 @@ namespace NineByteGames.Tdx.World
         for (int x = 0; x < NumberOfGridItemsWide; x++)
         {
           var gridPosition = new GridCoordinate(position, new InnerChunkGridCoordinate(x, y));
-          // TODO load this from somewhere else
-          var value = Mathf.PerlinNoise(gridPosition.X / 10f, gridPosition.Y / 10f);
+          var gridItem = GetGridItemAt(gridPosition);
 
-          byte variant = (byte)(Random.value * 4);
-
-          if (value > 0.7f)
-          {
-            this[new InnerChunkGridCoordinate(x, y)] = new GridItem(TileType.Water, variant);
-          }
-          else if (value < 0.3f)
-          {
-            this[new InnerChunkGridCoordinate(x, y)] = new GridItem(TileType.Hill, variant);
-          }
-          else
-          {
-            this[new InnerChunkGridCoordinate(x, y)] = new GridItem(TileType.Path, variant);
-          }
+          this[gridPosition.InnerChunkGridCoordinate] = gridItem;
         }
       }
+    }
+
+    private static GridItem GetGridItemAt(GridCoordinate gridPosition)
+    {
+      // TODO load this from somewhere else
+      var tileValue = Mathf.PerlinNoise(gridPosition.X / 10f, gridPosition.Y / 10f);
+
+      byte variant = (byte)(Random.value * 4);
+      GridItem gridItem;
+
+      if (tileValue > 0.7f)
+      {
+        gridItem = new GridItem(TileType.Water, variant);
+      }
+      else if (tileValue < 0.3f)
+      {
+        gridItem = new GridItem(TileType.Hill, variant);
+      }
+      else
+      {
+        gridItem = new GridItem(TileType.Path, variant);
+      }
+
+      var buildingValue = Mathf.PerlinNoise(-gridPosition.X / 8f, gridPosition.Y / 8f);
+      if (gridPosition.X % 2 == 0
+          && gridPosition.Y % 2 == 0
+          && buildingValue > 0.85f
+          && gridItem.Type != TileType.Water)
+      {
+        gridItem.BuildingType = BuildingType.TreeStump;
+        gridItem.BuildingInstance = 1;
+      }
+
+      return gridItem;
     }
 
     /// <summary> The position of the given chunk. </summary>
